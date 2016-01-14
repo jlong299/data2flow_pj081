@@ -12,10 +12,10 @@
 --            duty cycle of ena_glb and ena_glb_1bit are the same
 --            Output 1bit data : frameHead + length + payload + padding .   framHead : B2   length : 1~248    payload(1~248 bytes)   padding : 47
 --
--- Problems	: 
--- History	: 
---           verson 2  20151201 
---           Output 1bit data : frameHead + length + payload + padding .   framHead : 1ACFFCED(4 bytes)   length : 1~2048(2bytes)    payload(1~2048 bytes)   
+-- Problems	:
+-- History	:
+--           verson 2  20151201
+--           Output 1bit data : frameHead + length + payload + padding .   framHead : 1ACFFCED(4 bytes)   length : 1~2048(2bytes)    payload(1~2048 bytes)
 --           padding : 47    padding is need only when FIFO is empty
 --
 --			 verson  20151214
@@ -40,10 +40,11 @@ entity data2flow_pj081 is
   	ena_glb_1bit : in std_logic;
 
   	d_out	: out std_logic;
-  	val_out	: out std_logic
-	
+  	val_out	: out std_logic;
+	cnt_amount_frms_out : out unsigned(31 downto 0)  -- sync to rdclk
+
   ) ;
-end entity ; 
+end entity ;
 
 architecture arch of data2flow_pj081 is
 component ff_tx_pj081 IS
@@ -75,7 +76,7 @@ component ff_8to1_pj081 IS
 		q		: OUT STD_LOGIC_VECTOR (0 DOWNTO 0);
 		rdempty		: OUT STD_LOGIC ;
 		rdusedw		: OUT STD_LOGIC_VECTOR (16 DOWNTO 0);
-		wrfull		: OUT STD_LOGIC 
+		wrfull		: OUT STD_LOGIC
 	);
 END component;
 
@@ -85,10 +86,9 @@ END component;
 		(
 			 aReset	:		IN std_logic;
 		   ClockIn:  	IN  STD_LOGIC;
-		   Enable	: 	In	std_logic; --数据使能信号
-		   DataIn	:  	IN  STD_LOGIC; -- 待统计数据
-		   SyncFlag:  Out  STD_LOGIC;--本地序列发生器同步指示
-		   ErrResult: Out  STD_LOGIC_VECTOR(31 DOWNTO 0) --输出的误码率
+		   Enable	: 	In	std_logic;
+		   DataIn	:  	IN  STD_LOGIC;
+		   ErrResult: Out  STD_LOGIC_VECTOR(31 DOWNTO 0)
 		);
  END component;
 
@@ -122,6 +122,8 @@ signal rdusedw_1bit : std_logic_vector(16 downto 0) ;
 signal pn23 : std_logic_vector(23 downto 1) ;
 signal pn17_pd : std_logic_vector(17 downto 1) ;
 
+signal val_ff_out_d : std_logic;
+signal cnt_amount_frms :  unsigned(31 downto 0);  -- sync to rdclk
 
 begin
 
@@ -148,7 +150,7 @@ PORT map
 -------------------------------------------
 ---------- PART 2 : Wrtie FIFO
 --------------------------------------------
--- 
+--
 process( wrclk, aReset )
 begin
   if( aReset = '1' ) then
@@ -156,7 +158,7 @@ begin
   elsif( rising_edge(wrclk) ) then
   	d_in_reg <= d_in;
   end if ;
-end process ; 
+end process ;
 
  -- avoid fifo full
 process( wrclk, wrfull )
@@ -170,7 +172,7 @@ begin
 	  	wren_reg <= wren;
 	end if;
   end if ;
-end process ; 
+end process ;
 
 --------------------------------------------
 ----------  PART 3 : READ FIFO
@@ -179,7 +181,7 @@ end process ;
 	-- Logic to advance to the next state
 	process (rdclk, aReset)
 	begin
-		if aReset = '1' then	
+		if aReset = '1' then
 			state <= s0;
 			len_record <= (others => '0');
 		elsif (rising_edge(rdclk)) then
@@ -210,7 +212,7 @@ end process ;
 
 ----------------  End    state machine --------------------------
 
--- 	rden		
+-- 	rden
 process( rdclk, aReset )
 begin
   if( aReset = '1' ) then
@@ -245,7 +247,7 @@ begin
   		else
   			rden <= '0';
   		end if;
-			
+
   	else
   		cnt_rden <= (others => '0');
   		rden <= '0' ;
@@ -256,10 +258,10 @@ begin
   	cnt_rden <= cnt_rden;
   end if;
   end if ;
-end process ; 
+end process ;
 
 -----------------------------------------------
--- ena_glb :  1  1  0  0  0  0  1  1  
+-- ena_glb :  1  1  0  0  0  0  1  1
 -- rden    :  0  0  1  1  1  1  1  0
 -- rdreq   :  0  0  0  0  0  0  1  0
 -- rdreq should not be '1' when ena_glb='0'
@@ -291,11 +293,11 @@ begin
 
   		case cnt_rden is
   		when to_unsigned(0,16) =>
-  			d_ff_out <= x"1A"; --x"1A";  -- Head 
+  			d_ff_out <= x"1A"; --x"1A";  -- Head
   		when to_unsigned(1,16) =>
-  			d_ff_out <= x"CF"; --x"CF";  -- Head 
+  			d_ff_out <= x"CF"; --x"CF";  -- Head
   		when to_unsigned(2,16) =>
-  			d_ff_out <= x"0C"; --x"FC";  -- Head 
+  			d_ff_out <= x"0C"; --x"FC";  -- Head
   		when to_unsigned(3,16) =>
   			d_ff_out <= x"D2"; --x"ED";  -- Head
   		when to_unsigned(4,16) =>
@@ -310,7 +312,7 @@ begin
         if cnt_rden <= 5 then
           		pn23(23 downto 21) <= (others => '0');
           		pn23(20 downto 1) <= x"3725f";
-        else 
+        else
           		pn23(23 downto 9) <= pn23(15 downto 1);
 				pn23(8 downto 1)  <= pn23(23 downto 16) xor pn23(18 downto 11);
 		end if;
@@ -322,7 +324,7 @@ begin
   	end if;
   end if;
   end if ;
-end process ; 
+end process ;
 
 
 
@@ -335,7 +337,7 @@ begin
   if( aReset = '1' ) then
     d_padding <= (others => '0');
     pn17_pd(17 downto 2) <= (others => '0');
-    pn17_pd(1) <= '1';			
+    pn17_pd(1) <= '1';
   elsif( rising_edge(rdclk) ) then
   if ena_glb = '1'  then
   	if val_ff_out = '1' then
@@ -361,11 +363,11 @@ begin
 			  		    --------------------------------------------------
 end if;
 
-  	  		
+
 
   end if;
   end if ;
-end process ; 
+end process ;
 
 ----------------------------------------------
 ----------  PART 5 :  8 to 1
@@ -383,9 +385,9 @@ end process ;
 		wrreq		=> ena_glb,
 		q(0)		   => d_out,
 		rdempty	=> rdempty_1bit,
-		rdusedw	=> rdusedw_1bit,		
+		rdusedw	=> rdusedw_1bit,
 		wrfull	=> open
-		
+
 	);
 
     -- ena_glb and ean_glb_1bit must start at the same time after reset !!
@@ -396,7 +398,7 @@ end process ;
 			rdreq_1bit <= '0';
 			rdreq_start <= '0';
 			val_out <= '0';
-		elsif rising_edge(rdclk_1bit) then	
+		elsif rising_edge(rdclk_1bit) then
 		if ena_glb_1bit='1' then
 			if rdempty_1bit = '1' then
 				rdreq_1bit <= '0';
@@ -413,17 +415,29 @@ end process ;
 				rdreq_1bit <= '1';
 				rdreq_start <= rdreq_start;
 			end if;
-		
+
 		else
 			rdreq_1bit <= '0';
 		end if;
-			
+
 			val_out <= ena_glb_1bit;
 		end if;
 	end process;
 
-
-
-
+	---- cnt for amount of frames
+	-- 
+	process( rdclk, aReset )
+	begin
+	  if( aReset = '1' ) then
+	    val_ff_out_d <= '0';
+	    cnt_amount_frms <= (others => '0');	
+	  elsif( rising_edge(rdclk) ) then
+	  	val_ff_out_d <= val_ff_out;
+	  	if val_ff_out = '1' and val_ff_out_d = '0' then
+	  		cnt_amount_frms <= cnt_amount_frms + 1;
+	  	end if;
+	  end if ;
+	end process ; 
+	cnt_amount_frms_out <= cnt_amount_frms;
 
 end architecture ;

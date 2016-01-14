@@ -32,7 +32,9 @@ entity flow2data_pj081 is
   	val_in	 : in std_logic;
 
   	d_out	 : out std_logic_vector(7 downto 0) ;
-  	val_out	 : out std_logic
+  	val_out	 : out std_logic;
+    cnt_amount_frms_out : out unsigned(31 downto 0)  --sync to clk_1bit
+
   ) ;
 end entity ; 
 
@@ -54,6 +56,9 @@ signal cnt_s1 : unsigned(2 downto 0);
 
  constant cnst_len_max : unsigned(15 downto 0) := to_unsigned(2048,16);--2048,16);
 signal pn23 : std_logic_vector(23 downto 1) ;
+
+signal hit_head_d : std_logic;
+signal cnt_amount_frms :  unsigned(31 downto 0);
 
 begin
 
@@ -228,6 +233,21 @@ end process ;
    end if ;
  end process ; 
 
+-- cnt amount of frames
+-- 
+process( clk_1bit, aReset )
+begin
+  if( aReset = '1' ) then
+    hit_head_d <= '0' ;
+    cnt_amount_frms <= (others => '0');
+  elsif( rising_edge(clk_1bit) ) then
+    hit_head_d <= hit_head;
+    if hit_head = '1' and hit_head_d = '0' then
+      cnt_amount_frms <= cnt_amount_frms + 1;
+    end if;
+  end if ;
+end process ; 
+cnt_amount_frms_out <= cnt_amount_frms;
 
 
 end architecture ;
