@@ -40,7 +40,9 @@ entity data2flow_pj081 is
   	ena_glb_1bit : in std_logic;
 
   	d_out	: out std_logic;
-  	val_out	: out std_logic
+  	val_out	: out std_logic;
+
+  	justtst2 : out std_logic
 	
   ) ;
 end entity ; 
